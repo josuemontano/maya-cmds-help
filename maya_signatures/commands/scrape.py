@@ -8,7 +8,7 @@ import tempfile
 from re import findall
 
 import requests
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, NavigableString
 from six import iteritems
 
 from .base import Base
@@ -164,13 +164,20 @@ class Scrape(Base):
         web_page_data = requests.get(maya_command_url)
         soup_data = BeautifulSoup(web_page_data.content, "html.parser")
 
+        synopsis_code, description = self._parse_description(soup_data)
+
         raw_return_table = self._parse_return_table(soup_data)
         return_type = self._compile_return_table(raw_return_table)
 
         raw_flag_table = self._parse_flag_table(soup_data)
         flags = self._compile_flag_table(raw_flag_table)
 
-        return {"flags": flags, "return_type": return_type}
+        return {
+            "flags": flags,
+            "return_type": return_type,
+            "description": description,
+            "synopsis": synopsis_code,
+        }
 
     def _read_tempfile(self):
         """Attempt to read and store instance data from the cache file.
@@ -215,27 +222,15 @@ class Scrape(Base):
         print("wrote out tmp file %s" % self.cache_file)
 
     @classmethod
-    def _parse_synopsis(cls, soup_code_object):
-        """Parse the webpage for the synopsis value.
-        :param soup_code_object: str, return of beautiful soup for maya help doc page
-        :return: list(str): list of synopsis values (should be the flags)
-        """
-        synopses = []
-        for child in [child for child in soup_code_object.children]:
-            synopses.append(
-                str(child) if not hasattr(child, "string") else child.string
-            )
-        return synopses
-
-    @classmethod
     def _parse_flag_table(cls, soup_obj):
         """Parse (naively) the webpage for the flag table.
+
         :param soup_obj: str, return of beautiful soup for maya help doc page
         :return: list(list(str, str, str, str)): list of lists len 4 of:
                     flag name, short name, data type, description
         """
         anchor = soup_obj.find("a", attrs={"name": "hFlags"})
-        if not anchor: # Some commands do not have flags
+        if not anchor:  # Some commands do not have flags
             return []
 
         signature_table = anchor.find_parent("h2").find_next_sibling("table")
@@ -270,8 +265,9 @@ class Scrape(Base):
     @staticmethod
     def _compile_flag_table(flag_data_set):
         """Take the parsed data set from Scrape.parse_flag_table and creates a dictionary.
+
         :param flag_data_set: list(list(str, str, str, str)): list of lists len 4 of:
-                                flag name, short name, data type, description
+                              flag name, short name, data type, description
         :return: dict(str:dict(str:str, str:str, str:str), dict with keys of flags and each flag value is a dict
                  of short name 'short', data type 'data_type' and description 'description'
         """
@@ -289,9 +285,9 @@ class Scrape(Base):
     @staticmethod
     def _parse_return_table(soup_obj):
         """Parse (naively) the webpage for the return table.
+
         :param soup_obj: str, return of beautiful soup for maya help doc page
-        :return: list(list(str, str)): list of lists len 2 of:
-                    data type, description
+        :return: list(list(str, str)): list of lists len 2 of: data type, description
         """
         # Find the hReturn header
         anchor = soup_obj.find("a", attrs={"name": "hReturn"})
@@ -307,3 +303,41 @@ class Scrape(Base):
             {"data_type": data_type, "description": desc}
             for data_type, desc in grouped_data_set
         ]
+
+    @staticmethod
+    def _parse_description(soup_obj):
+        """Parse (naively) the webpage for the description of the command.
+
+        :param soup_obj: str, return of beautiful soup for maya help doc page
+        :return: str: string with the description
+        """
+        synopsis_h2 = soup_obj.find("a", {"name": "hSynopsis"}).find_parent("h2")
+
+        # Step 2: Collect all siblings until the next h2
+        content = []
+        for sibling in synopsis_h2.next_siblings:
+            if sibling.name == "h2":
+                break
+            else:
+                content.append(sibling)
+
+        # Step 3: Separate the <code> block (synopsis line) and the description
+        synopsis_code = None
+        description_parts = []
+
+        for item in content:
+            if isinstance(item, NavigableString):
+                text = item.strip()
+                if text:
+                    description_parts.append(text.replace("\n", " "))
+                continue
+
+            code_block = item.find("code") if hasattr(item, "find") else None
+            if code_block and not synopsis_code:
+                synopsis_code = code_block.get_text(strip=True).replace("\n", "")
+            else:
+                text = item.get_text()
+                if text:
+                    description_parts.append(text.replace("\n", " "))
+
+        return [synopsis_code, " ".join(description_parts)]
