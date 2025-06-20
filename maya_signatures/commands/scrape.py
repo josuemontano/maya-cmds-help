@@ -15,7 +15,7 @@ from bs4 import BeautifulSoup
 
 class Scrape(Base):
     """ Class responsible for handling Maya help doc command queries and returns function signatures.
-    
+
     """
     BASEURL = 'http://help.autodesk.com/cloudhelp/{MAYAVERSION}/ENU/Maya-Tech-Docs/CommandsPython/'
     _EXTENSION = 'html'
@@ -33,7 +33,7 @@ class Scrape(Base):
     @property
     def cache_file(self):
         """ Provide the cache file path
-        
+
         - **parameters**, **types**, **return**::
             :return: str
         """
@@ -42,8 +42,8 @@ class Scrape(Base):
     @property
     def cached(self):
         """ Provide the raw cache with urls as the dictionary keys
-        
-        - **parameters**, **types**, **return**::    
+
+        - **parameters**, **types**, **return**::
             :return: dict
         """
         return self.__cache
@@ -51,7 +51,7 @@ class Scrape(Base):
     @property
     def stored_commands(self):
         """ Provide a list of commands that are currently stored.
-        
+
         - **parameters**, **types**, **return**::
             :return: list
         """
@@ -59,9 +59,9 @@ class Scrape(Base):
 
     def run(self):
         """ CLI interface command runner.
-        
+
         - **parameters**, **types**, **return**::
-            :return: dict, command signatures dictionary sorted the commands as the keys 
+            :return: dict, command signatures dictionary sorted the commands as the keys
         """
         self._read_tempfile()
         for command in self.kwargs.get('MAYA_CMDS', []):
@@ -83,7 +83,7 @@ class Scrape(Base):
 
     def get_command_flags(self, command):
         """ Return only the flags for the given command.
-        
+
         - **parameters**, **types**, **return**::
             :param command: str, maya command
             :return: list(list(str, str)), list of lists of flags in format: [<long name>, <short name>]
@@ -93,7 +93,7 @@ class Scrape(Base):
 
     def build_command_stub(self, command, shortname=False, combined=False):
         """ Build a Python stub for the given command.
-        
+
         - **parameters**, **types**, **return**::
             :param command: str, valid maya command
             :param shortname: bool, whether or not we want to use the shortname of the flags
@@ -139,7 +139,7 @@ class Scrape(Base):
 
     def reset_cache(self):
         """ Clear the cache file of contents.
-        
+
         - **parameters**, **types**, **return**::
             :return: None
         """
@@ -148,7 +148,7 @@ class Scrape(Base):
     @Memoize
     def _scrape_command(self, maya_command_url):
         """ Actual worker command which parses the Maya online help docs for the given command URL.
-        
+
         - **parameters**, **types**, **return**::
             :return: dict(str:dict(str:str, str:str, str:str), dict with keys of flags and each flag value is a dict
                      of short name 'short', data type 'data_type' and description 'description'
