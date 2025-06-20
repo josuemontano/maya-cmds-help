@@ -164,9 +164,13 @@ class Scrape(Base):
         web_page_data = requests.get(maya_command_url)
         soup_data = BeautifulSoup(web_page_data.content, "html.parser")
 
+        raw_return_table = self._parse_return_table(soup_data)
+        return_type = self._compile_return_table(raw_return_table)
+
         raw_flag_table = self._parse_flag_table(soup_data)
         flags = self._compile_flag_table(raw_flag_table)
-        return {"flags": flags}
+
+        return {"flags": flags, "return_type": return_type}
 
     def _read_tempfile(self):
         """Attempt to read and store instance data from the cache file.
@@ -281,3 +285,25 @@ class Scrape(Base):
             }
 
         return flags
+
+    @staticmethod
+    def _parse_return_table(soup_obj):
+        """Parse (naively) the webpage for the return table.
+        :param soup_obj: str, return of beautiful soup for maya help doc page
+        :return: list(list(str, str)): list of lists len 2 of:
+                    data type, description
+        """
+        # Find the hReturn header
+        anchor = soup_obj.find("a", attrs={"name": "hReturn"})
+        table = anchor.find_parent("h2").find_next_sibling("table")
+
+        values = [td.get_text(strip=True) for td in table.find_all("td")]
+        return values
+
+    @staticmethod
+    def _compile_return_table(return_data_set):
+        grouped_data_set = zip(return_data_set[::2], return_data_set[1::2])
+        return [
+            {"data_type": data_type, "description": desc}
+            for data_type, desc in grouped_data_set
+        ]
