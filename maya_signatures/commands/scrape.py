@@ -166,7 +166,7 @@ class Scrape(Base):
 
         raw_flag_table = self._parse_flag_table(soup_data)
         flags = self._compile_flag_table(raw_flag_table)
-        return flags
+        return {"flags": flags}
 
     def _read_tempfile(self):
         """Attempt to read and store instance data from the cache file.
