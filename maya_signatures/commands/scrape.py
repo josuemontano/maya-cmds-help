@@ -224,17 +224,14 @@ class Scrape(Base):
         return synopses
 
     @classmethod
-    def _parse_flag_table(cls, soup_code_object):
+    def _parse_flag_table(cls, soup_obj):
         """Parse (naively) the webpage for the flag table.
-        :param soup_code_object: str, return of beautiful soup for maya help doc page
+        :param soup_obj: str, return of beautiful soup for maya help doc page
         :return: list(list(str, str, str, str)): list of lists len 4 of:
                     flag name, short name, data type, description
         """
-        signature_table = [
-            table
-            for table in soup_code_object.body.find_all("table")
-            if "Long name (short name)" in str(table.find_all("tr"))
-        ][0]
+        anchor = soup_obj.find("a", attrs={"name": "hFlags"})
+        signature_table = anchor.find_parent("h2").find_next_sibling("table")
 
         data = []
         for table_row in signature_table.find_all("td"):
