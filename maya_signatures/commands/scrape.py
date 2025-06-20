@@ -231,21 +231,37 @@ class Scrape(Base):
                     flag name, short name, data type, description
         """
         anchor = soup_obj.find("a", attrs={"name": "hFlags"})
+        if not anchor: # Some commands do not have flags
+            return []
+
         signature_table = anchor.find_parent("h2").find_next_sibling("table")
+        table_rows = signature_table.find_all("tr")[1:]
+        grouped_rows = list(zip(table_rows[::2], table_rows[1::2]))
 
         data = []
-        for table_row in signature_table.find_all("td"):
-            # This is a ghetto way of checking whether it's the right row we want...but it works.
-            if table_row.attrs.get("colspan") is None:
-                text = str(table_row.text.strip()).replace("\n", " ")
-                # Might need refactoring later depending on how they format their flags/descriptions, but we'll see
-                if len(text.split("(")) == 2 and " " not in text:
-                    text = [t.replace(")", "") for t in text.split("(")]
-                    data += text
-                elif text:
-                    data.append(text)
+        for flag_row, desc_row in grouped_rows:
+            # Get the name and short name
+            code_tag = flag_row.find("code")
+            if not code_tag:
+                continue
+            raw = code_tag.get_text(strip=True)
+            name_part = raw.split("(")
+            if len(name_part) != 2:
+                continue
+            flag_name = name_part[0]
+            short_name = name_part[1].rstrip(")")
 
-        return [data[x : x + 4] for x in range(0, len(data), 4)]
+            # Data type is in the second <td>
+            type_td = flag_row.find_all("td")[1]
+            data_type = type_td.get_text(strip=True)
+
+            # Description is inside nested table > td
+            desc_td = desc_row.find("table").find("td", width=None)
+            description = " ".join(desc_td.stripped_strings)
+
+            data.append([flag_name, short_name, data_type, description])
+
+        return data
 
     @staticmethod
     def _compile_flag_table(flag_data_set):
