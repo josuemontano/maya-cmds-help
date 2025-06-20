@@ -27,7 +27,7 @@ class Scrape(Base):
     def __init__(self, *args, **kwargs):
         super(Scrape, self).__init__(*args, **kwargs)
         self.depth = self.kwargs.get("--depth", 1)
-        self.maya_version = self.kwargs.get("--mayaversion", ["2017"])[0]
+        self.maya_version = self.kwargs.get("--mayaversion", ["2023"])[0]
         self.command_signatures = {}
         self.run()
 
