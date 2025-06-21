@@ -293,8 +293,11 @@ class Scrape(Base):
         anchor = soup_obj.find("a", attrs={"name": "hReturn"})
         table = anchor.find_parent("h2").find_next_sibling("table")
 
-        values = [td.get_text(strip=True) for td in table.find_all("td")]
-        return values
+        if table:
+            values = [td.get_text(strip=True) for td in table.find_all("td")]
+            return values
+        else:
+            return [[None, ""]]
 
     @staticmethod
     def _compile_return_table(return_data_set):
