@@ -8,7 +8,7 @@ import tempfile
 from re import findall
 
 import requests
-from bs4 import BeautifulSoup, NavigableString
+from bs4 import BeautifulSoup, NavigableString, Tag
 from six import iteritems
 
 from .base import Base
@@ -169,8 +169,7 @@ class Scrape(Base):
         raw_return_table = self._parse_return_table(soup_data)
         return_type = self._compile_return_table(raw_return_table)
 
-        raw_flag_table = self._parse_flag_table(soup_data)
-        flags = self._compile_flag_table(raw_flag_table)
+        flags = self._parse_flag_table(soup_data)
 
         return {
             "flags": flags,
@@ -234,7 +233,7 @@ class Scrape(Base):
             return []
 
         signature_table = anchor.find_parent("h2").find_next_sibling("table")
-        table_rows = signature_table.find_all("tr")[1:]
+        table_rows = signature_table.find_all("tr")[2:] # Remove header and divider before content
         grouped_rows = list(zip(table_rows[::2], table_rows[1::2]))
 
         data = []
@@ -258,29 +257,16 @@ class Scrape(Base):
             desc_td = desc_row.find("table").find("td", width=None)
             description = " ".join(desc_td.stripped_strings)
 
-            data.append([flag_name, short_name, data_type, description])
+            data.append(
+                {
+                    "name": flag_name,
+                    "short_name": short_name,
+                    "data_type": data_type,
+                    "description": description,
+                }
+            )
 
         return data
-
-    @staticmethod
-    def _compile_flag_table(flag_data_set):
-        """Take the parsed data set from Scrape.parse_flag_table and creates a dictionary.
-
-        :param flag_data_set: list(list(str, str, str, str)): list of lists len 4 of:
-                              flag name, short name, data type, description
-        :return: dict(str:dict(str:str, str:str, str:str), dict with keys of flags and each flag value is a dict
-                 of short name 'short', data type 'data_type' and description 'description'
-        """
-        flags = {}
-        for flag_data in flag_data_set:
-            name, short, data_type, description = flag_data
-            flags[name] = {
-                "short": short,
-                "data_type": data_type,
-                "description": description,
-            }
-
-        return flags
 
     @staticmethod
     def _parse_return_table(soup_obj):
@@ -289,15 +275,28 @@ class Scrape(Base):
         :param soup_obj: str, return of beautiful soup for maya help doc page
         :return: list(list(str, str)): list of lists len 2 of: data type, description
         """
-        # Find the hReturn header
         anchor = soup_obj.find("a", attrs={"name": "hReturn"})
-        table = anchor.find_parent("h2").find_next_sibling("table")
+        if not anchor:
+            return [None, ""]
 
-        if table:
-            values = [td.get_text(strip=True) for td in table.find_all("td")]
-            return values
-        else:
-            return [[None, ""]]
+        start_h2 = anchor.find_parent("h2")
+        if not start_h2:
+            return [None, ""]
+
+        # Collect all elements between this h2 and the next h2
+        section_content = []
+        for sibling in start_h2.next_siblings:
+            if isinstance(sibling, Tag) and sibling.name == "h2":
+                break
+            section_content.append(sibling)
+
+        # Search for the first <table> in that section
+        for element in section_content:
+            if isinstance(element, Tag) and element.name == "table":
+                values = [td.get_text(strip=True) for td in element.find_all("td")]
+                return values
+
+        return [None, ""]
 
     @staticmethod
     def _compile_return_table(return_data_set):
